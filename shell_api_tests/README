@@ -1,0 +1,12 @@
+The shell_api_tests library contains the installer: install-api-lib.
+To install the library run: sudo ./install-api-lib
+
+The installer will walk through any questions and required dependencies.
+
+If the base OS is a Amazon Linux distro the following information may apply:
+http://aws.amazon.com/amazon-linux-ami/faqs/
+How do I enable the Extra Packages for Enterprise Linux (EPEL) repository?
+
+Modify /etc/yum.repos.d/epel.repo. Under the section marked [epel], change enabled=0 to enabled=1.
+
+To temporarily enable the EPEL 6 repository, use the yum command line option --enablerepo=epel.

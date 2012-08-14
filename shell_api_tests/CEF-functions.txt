@@ -1,0 +1,94 @@
+
+
+UserLoginToCEF () {
+#Params: none
+#Output: one line per user in CEF format
+	AllUserNames=''
+
+	AllUsers="`GET /users`"
+	RetCode=$?
+	NumUsers=`echo "$AllUsers" | jsawk 'return this.users.length'`
+	for UId in `seq 0 $[$NumUsers - 1]` ; do
+		AllUserNames="$AllUserNames `echo \"$AllUsers\" | jsawk \"return this.users[$UId].username\"`"
+	done
+	#Simple field output example
+	#for OneUserName in $AllUserNames ; do
+	#	UserDetails="$(GET /users/`IdOfUser $OneUserName`)"
+	#	echo -n "$OneUserName,"
+	#	LastLoginTime=`echo "$UserDetails" | jsawk "return this.user.last_login_at"`
+	#	echo -n "$LastLoginTime,"
+	#	LastLoginIp=`echo "$UserDetails" | jsawk "return this.user.last_login_ip"`
+	#	echo "$LastLoginIp"
+	#done
+
+	for OneUserName in $AllUserNames ; do
+		UserDetails="$(GET /users/`IdOfUser $OneUserName`)"
+
+		#Supplied form 2012-02-17T16:47:47Z
+		#Needed form:  MMM dd yyyy HH:mm:ss
+		LastLoginTime=`echo "$UserDetails" \
+		 | jsawk "return this.user.last_login_at" \
+		 | sed -e 's/^\([0-9][0-9]*\)-\([0-9][0-9]\)*-\([0-9][0-9]\)*T\([0-9][0-9]*:[0-9][0-9]*:[0-9][0-9]\)*Z$/\2 \3 \1 \4/' -e 's/^01 /JAN /' -e 's/^02 /FEB /' -e 's/^03 /MAR /' -e 's/^04 /APR /' -e 's/^05 /MAY /' -e 's/^06 /JUN /' -e 's/^07 /JUL /' -e 's/^08 /AUG /' -e 's/^09 /SEP /' -e 's/^10 /OCT /' -e 's/^11 /NOV /' -e 's/^12 /DEC /'`
+
+		LastLoginIp=`echo "$UserDetails" | jsawk "return this.user.last_login_ip"`
+
+		echo "CEF:0|CloudPassage|HaloPortal|4A|100|Portal Login|2|app=HTTPS|dhost=portal.cloudpassage.com|duser=$OneUserName|outcome=success|proto=TCP|spriv=User|start=$LastLoginTime|src=$LastLoginIp|deviceDirection=inbound"
+	done
+
+	return $RetCode
+}
+
+
+SCAToCEF () {
+#Params: server(s) from which to pull
+#Output: one line per issue in CEF format
+
+	for OneServer in "$@" ; do
+		Issues=$(GET /servers/`IdOfServer $OneServer`/issues/)
+		#FIXME - merge return codes from all pulls
+		RetCode=$?
+
+		ScaCount=`echo "$Issues" | jsawk 'return this.sca.findings.length'`
+		for SId in `seq 0 $[$ScaCount - 1]` ; do
+			ThisIssue=`echo "$Issues" | jsawk "return this.sca.findings[$SId]"`
+			RuleName=`echo "$ThisIssue" | jsawk 'return this.rule_name' | sed -e 's/ /_/g' | tr -dc '[[:alnum:]_]'`
+			if [ "`echo \"$ThisIssue\" | jsawk 'return this.critical'`" = "true" ]; then
+				Severity=8
+			else
+				Severity=2
+			fi
+
+			echo "CEF:0|CloudPassage|HaloPortal|4A|100|ConfigVulnerability|$Severity|msg=$RuleName|dhost=$OneServer|outcome=failure|CloudPassageHaloPortalSCADetails=$ThisIssue"
+		done
+
+	done
+
+	return $RetCode
+}
+
+
+SVMToCEF () {
+#Params: server(s) from which to pull
+#Output: one line per issue in CEF format
+
+	for OneServer in "$@" ; do
+		Issues=$(GET /servers/`IdOfServer $OneServer`/issues/)
+		#FIXME - merge return codes from all pulls
+		RetCode=$?
+
+		SvmCount=`echo "$Issues" | jsawk 'return this.svm.findings.length'`
+		for SId in `seq 0 $[$SvmCount - 1]` ; do
+			ThisIssue=`echo "$Issues" | jsawk "return this.svm.findings[$SId]"`
+			PackageName=`echo "$ThisIssue" | jsawk 'return this.package_name' | sed -e 's/ /_/g'`
+			PackageVersion=`echo "$ThisIssue" | jsawk 'return this.package_version' | sed -e 's/ /_/g'`
+			if [ "`echo \"$ThisIssue\" | jsawk 'return this.critical'`" = "true" ]; then
+				Severity=8
+			else
+				Severity=2
+			fi
+			echo "CEF:0|CloudPassage|HaloPortal|4A|100|SoftwareVulnerability|$Severity|msg=${PackageName}-${PackageVersion}|dhost=$OneServer|outcome=failure|CloudPassageHaloPortalSVMDetails=$ThisIssue"
+		done
+	done
+
+	return $RetCode
+}

@@ -1,0 +1,92 @@
+#!/bin/bash
+
+#. /home/wstearns/med/cloudpassage/api/api-lib
+. /usr/local/bin/api-lib
+echo "All tests will be run against:"
+#resty 'https://portal.cloudpassage.com/api/1*'
+#resty https://staging.cloudpassage.com/api/1 -W --insecure
+resty 'https://staging.cloudpassage.com/api/1*'
+
+#Task to complete:
+#Test firewall rule management (CRUD, assign to policies, reorder) via API
+
+
+
+
+#User modifiable settings.  Please, alphanumeric, dash, and underscore only (no leading dash).
+TestFirewallPolicy="APITestFirewallRulePolicy-DoNotUse"
+
+
+
+
+
+echo '================ Setup ================'
+Header TestAPILive
+if [ "`GetZoneDetails any`" = '{}' ]; then
+	TestFail "We do not seem to be able to successfully make API calls"
+	echo "('GetZoneDetails any' did not return any information).  Please"
+	echo "check: firewall(s), api key in ~/.resty/grid.host.name, api-lib"
+	echo "completely installed, etc.  Exiting."
+	exit 1
+fi
+
+
+
+echo '================ Set up firewall policy for testing ================'
+Header CreateFirewallPolicy
+DeletePolicy "$TestFirewallPolicy" >/dev/null 2>&1
+CreatePolicy "$TestFirewallPolicy" "${TestFirewallPolicy}-description" \
+								|| TestFail "Firewall policy not created"
+Header ListFirewallPolicies
+[ -n "`IdOfPolicy $TestFirewallPolicy`" ]			|| TestFail "Firewall policy not created (can't find ID)"
+
+
+
+echo '================ Add new firewall rule tests ================'
+Header CreateNewFirewallRule
+NewRule="`CreateRule \"$TestFirewallPolicy\" INPUT 1 drop active new related log`" \
+								|| TestFail "Unable to create new firewall rule in $TestFirewallPolicy"
+[ `echo "$NewRule" | wc -l` -eq 1 ]				|| TestFail "Got fewer than or more than 1 rule(s) added to $TestFirewallPolicy"
+
+
+
+echo '================ Read back firewall rule tests ================'
+Header GetFirewallRuleDetails
+[ "`GetRuleDetails $TestFirewallPolicy $NewRule | jsawk 'return this.firewall_rule.log'`" = 'true' ] \
+								|| TestFail "Could not get rule details for $NewRule in $TestFirewallPolicy"
+
+
+
+echo '================ Make firewall rule inactive tests ================'
+Header UpdateFirewallRule
+GetRuleDetails "$TestFirewallPolicy" "$NewRule" | jsawk 'this.firewall_rule.active = "false"' | UpdateRule "$TestFirewallPolicy" "$NewRule"
+[ "`GetRuleDetails \"$TestFirewallPolicy\" \"$NewRule\" | jsawk 'return this.firewall_rule.active'`" = 'false' ] \
+								|| TestFail "Could not inactivate rule $NewRule in $TestFirewallPolicy"
+
+
+
+echo '================ Reorder firewall rule tests ================'
+Header MoveFirewallRule
+CreateRule "$TestFirewallPolicy" INPUT ACCEPT active ESTABLISHED related log >/dev/null 2>&1 \
+								|| TestFail "Unable to create new dummy firewall rule in $TestFirewallPolicy"
+GetRuleDetails "$TestFirewallPolicy" "$NewRule" | jsawk 'this.firewall_rule.position = "last"' | UpdateRule "$TestFirewallPolicy" "$NewRule" \
+								|| TestFail "Could not move rule $NewRule to the bottom of $TestFirewallPolicy"
+
+
+
+echo '================ Delete firewall rule tests ================'
+Header DeleteFirewallRule
+DeleteRule "$TestFirewallPolicy" "$NewRule" >/dev/null		|| TestFail "Unable to delete new firewall rule"
+[ "`GetRuleDetails \"$TestFirewallPolicy\" \"$NewRule\" 2>/dev/null | jsawk 'return this.firewall_rule.log' 2>/dev/null`" != 'true' ] \
+								|| TestFail "Could still get rule details for $NewRule in $TestFirewallPolicy after deletion, bad."
+
+
+
+echo '================ Cleanup ================'
+DeletePolicy "$TestFirewallPolicy" >/dev/null 2>&1
+Header TestsComplete
+
+
+
+
+

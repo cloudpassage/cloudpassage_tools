@@ -1,0 +1,1006 @@
+#!/bin/bash
+Version='0.21'
+echo "CloudPassage api-lib version $Version loaded." >&2
+
+
+#Add Usage for incorrect number of params or "-h" param
+
+. resty 	#https://sandbox.cloudpassage.com/api/1 -W --insecure --verbose
+#This has been moved to run-api-tests
+#echo "All tests will be run against:"
+#resty https://sandbox.cloudpassage.com/api/1 -W --insecure
+
+Header () {
+	echo "==== Testing $@"
+}
+
+TestFail () {
+	echo "`date +%Y%m%d%H%M%S` FAIL: $@" >&2
+	#Additional steps can be taken here; syslog, email, append to file, whatever is needed.
+	#exit 1
+}
+
+
+#================ Users API functions ================
+
+
+IdOfUser () {
+#$1: Name of user for which you want an ID
+#Sample call:		IdOfUser Barney
+#stdout: Group id for that user
+	AllUsers="`GET /users`"
+	RetCode=$?
+	NumUsers=`echo "$AllUsers" | jsawk 'return this.users.length'`
+	for UId in `seq 0 $[$NumUsers - 1]` ; do
+		echo "$AllUsers" | jsawk "if (this.users[$UId].username == '$1') return this.users[$UId].id; else return null"
+	done
+	return $RetCode
+}
+
+
+UserLoginToCEF () {
+#Params: none
+#Output: one line per user in CEF format
+	AllUserNames=''
+
+	AllUsers="`GET /users`"
+	RetCode=$?
+	NumUsers=`echo "$AllUsers" | jsawk 'return this.users.length'`
+	for UId in `seq 0 $[$NumUsers - 1]` ; do
+		AllUserNames="$AllUserNames `echo \"$AllUsers\" | jsawk \"return this.users[$UId].username\"`"
+	done
+	#Simple field output example
+	#for OneUserName in $AllUserNames ; do
+	#	UserDetails="$(GET /users/`IdOfUser $OneUserName`)"
+	#	echo -n "$OneUserName,"
+	#	LastLoginTime=`echo "$UserDetails" | jsawk "return this.user.last_login_at"`
+	#	echo -n "$LastLoginTime,"
+	#	LastLoginIp=`echo "$UserDetails" | jsawk "return this.user.last_login_ip"`
+	#	echo "$LastLoginIp"
+	#done
+
+	for OneUserName in $AllUserNames ; do
+		UserDetails="$(GET /users/`IdOfUser $OneUserName`)"
+
+		#Supplied form 2012-02-17T16:47:47Z
+		#Needed form:  MMM dd yyyy HH:mm:ss
+		LastLoginTime=`echo "$UserDetails" \
+		 | jsawk "return this.user.last_login_at" \
+		 | sed -e 's/^\([0-9][0-9]*\)-\([0-9][0-9]\)*-\([0-9][0-9]\)*T\([0-9][0-9]*:[0-9][0-9]*:[0-9][0-9]\)*Z$/\2 \3 \1 \4/' -e 's/^01 /JAN /' -e 's/^02 /FEB /' -e 's/^03 /MAR /' -e 's/^04 /APR /' -e 's/^05 /MAY /' -e 's/^06 /JUN /' -e 's/^07 /JUL /' -e 's/^08 /AUG /' -e 's/^09 /SEP /' -e 's/^10 /OCT /' -e 's/^11 /NOV /' -e 's/^12 /DEC /'`
+
+		LastLoginIp=`echo "$UserDetails" | jsawk "return this.user.last_login_ip"`
+
+		echo "CEF:0|CloudPassage|HaloPortal|4A|100|Portal Login|2|app=HTTPS|dhost=portal.cloudpassage.com|duser=$OneUserName|outcome=success|proto=TCP|spriv=User|start=$LastLoginTime|src=$LastLoginIp|deviceDirection=inbound"
+	done
+
+	return $RetCode
+}
+
+
+#================ Account API functions ================
+
+
+ActiveAccountsOnServer () {
+#$1: Name of host for which you want a list of all accounts
+#Sample call:		ActiveAccountsOnServer boomer
+#stdout: accounts, one per line
+	MyServerId="`IdOfServer \"$1\"`"
+	if [ -n "$MyServerId" ]; then
+		ActiveAccounts="`GET /servers/$MyServerId/accounts/`"
+		RetCode=$?
+		NumAccounts=`echo "$ActiveAccounts" | jsawk 'return this.accounts.length'`
+		for AId in `seq 0 $[$NumAccounts - 1]` ; do
+			echo "$ActiveAccounts" | jsawk "return this.accounts[$AId].username"
+		done
+		return $RetCode
+	else
+		echo "No Server ID for $1" >&2
+		echo '{}'
+		return 1
+	fi
+}
+
+
+#================ Server Group API functions ================
+
+
+AllGroupPolicyIds () {
+#No parameters
+#Sample call:		AllGroupPolicyIds
+#Sample output:
+#		"980c5d208a5c012ed4f040409a8ae098"
+#		"bcfc4f508f12012ed4f740409a8ae098"
+	AllGroups="`GET /groups`"
+	RetCode=$?
+	NumGroups=`echo "$AllGroups" | jsawk 'return this.groups.length'`
+	for GId in `seq 0 $[$NumGroups - 1]` ; do
+		echo "$AllGroups" | jsawk "return this.groups[$GId].policy_ids"
+	done \
+	 | sed -e 's/\[//g' -e 's/\]//g' -e 's/, */\n/g' \
+	 | sort -u
+	return $RetCode
+}
+
+
+IdOfGroup () {
+#$1: Name of group for which you want an ID
+#Sample call:		IdOfGroup Unretired
+#stdout: Group id for that group
+	AllGroups="`GET /groups`"
+	RetCode=$?
+	NumGroups=`echo "$AllGroups" | jsawk 'return this.groups.length'`
+	for GId in `seq 0 $[$NumGroups - 1]` ; do
+		echo "$AllGroups" | jsawk "if (this.groups[$GId].name == '$1') return this.groups[$GId].id; else return null"
+	done
+	return $RetCode
+}
+
+
+ActiveServerIdsInGroup () {
+#$1: Name of group for which you want a list of all server IDS
+#Sample call:		ActiveServerIdsInGroup Unassigned
+#stdout: server ids, one per line
+	MyGroupId="`IdOfGroup \"$1\"`"
+	if [ -n "$MyGroupId" ]; then
+		ActiveServers="`GET /groups/$MyGroupId/servers/`"
+		RetCode=$?
+		NumServers=`echo "$ActiveServers" | jsawk 'return this.servers.length'`
+		for SId in `seq 0 $[$NumServers - 1]` ; do
+			echo "$ActiveServers" | jsawk "return this.servers[$SId].id"
+		done
+		return $RetCode
+	else
+		echo "No Group ID for $1" >&2
+		echo '{}'
+		return 1
+	fi
+}
+
+
+ActiveHostnamesInGroup () {
+#$1: Name of group for which you want a list of all hostnames
+#Sample call:		ActiveHostnamesInGroup Unassigned
+#stdout: hostnames, one per line
+	MyGroupId="`IdOfGroup \"$1\"`"
+	if [ -n "$MyGroupId" ]; then
+		ActiveServers="`GET /groups/$MyGroupId/servers/`"
+		RetCode=$?
+		NumServers=`echo "$ActiveServers" | jsawk 'return this.servers.length'`
+		for SId in `seq 0 $[$NumServers - 1]` ; do
+			echo "$ActiveServers" | jsawk "return this.servers[$SId].hostname"
+		done
+		return $RetCode
+	else
+		echo "No Group ID for $1" >&2
+		echo '{}'
+		return 1
+	fi
+}
+
+
+CreateGroup () {
+#$1: Name of group to create
+#Sample call:		CreateGroup webservers
+#no output
+	PostOut=$(echo '{"group":{"name":"'"$1"'","policy_ids":['`AllGroupPolicyIds | head -1`']}}' | POST /groups --verbose 2>&1)
+	RetCode=$?
+	#Location=$(echo "$PostOut" | grep '^< Location: ' | sed -e 's/^< Location: //')
+	#echo "CreateGroup: returned location is $Location" >&2
+	#Sample:		https://sandbox.cloudpassage.com/api/1/groups/687a089092db012ed50b40409a8ae098
+	return $RetCode
+}
+
+
+DeleteGroup () {
+#$1: Name of group to delete
+#Sample call:		DeleteGroup webservers
+	MyGroupId="`IdOfGroup \"$1\"`"
+	if [ -n "$MyGroupId" ]; then
+		#Note; the "?" and "=" get encoded by resty unless we add -Q to the command line.
+		DELETE "/groups/${MyGroupId}?move_to_unassigned=true" -Q
+		return $?
+	else
+		echo "No Group ID for $1" >&2
+		#No need to return a json object
+		return 1
+	fi
+}
+
+
+GetGroupDetails () {
+#$1: Name of group for which you want details
+#Sample call:		GetGroupDetails webservers
+#Returns: json object with group details
+	MyGroupId="`IdOfGroup \"$1\"`"
+	if [ -n "$MyGroupId" ]; then
+		GET "/groups/$MyGroupId"
+		return $?
+	else
+		echo "No Group ID for $1" >&2
+		echo '{}'
+		return 1
+	fi
+}
+
+
+UpdateGroup () {
+#STDIN: Feed json object with updated information on stdin
+#Sample call:		GetGroupDetails webservers |  jsawk 'this.groups.tag = "webserver-tag"' | UpdateGroup webservers
+#$1: Name of group you wish to update
+	MyGroupId="`IdOfGroup \"$1\"`"
+	if [ -n "$MyGroupId" ]; then
+		PUT "/groups/$MyGroupId"
+		return $?
+	else
+		echo "No Group ID for $1" >&2
+		#No need to return a json object
+		return 1
+	fi
+}
+
+
+#We don't provide an explicit AssignFirewallPolicyToGroup function;
+#create a json object for the firewall change request and hand to
+#UpdateGroup.  Example:
+#echo '{ "group": { "firewall_policy_id": "'"`IdOfPolicy $TestFirewallPolicy`"'" } }' | UpdateGroup "$TestGroup1" \
+#								|| TestFail "Cannot assign $TestFirewallPolicy to group $TestGroup1"
+
+
+
+
+#================ Server API functions ================
+
+
+IdOfServer () {
+#$1: Name of server for which you want an ID (use same hostname as found in web interface)
+#Sample call:		IdOfServer starling
+#stdout: Server id for that server
+	AllServers="`GET /servers`"
+	RetCode=$?
+	NumServers=`echo "$AllServers" | jsawk 'return this.servers.length'`
+	for SId in `seq 0 $[$NumServers - 1]` ; do
+		echo "$AllServers" | jsawk "if (this.servers[$SId].hostname == '$1') return this.servers[$SId].id; else return null"
+	done
+	return $RetCode
+}
+
+
+ServerIssues () {
+#$1: Name of server for which you want issues
+#Sample call:		ServerIssues starling
+#Returns: json object with issue details
+	MyServerId="`IdOfServer \"$1\"`"
+	if [ -n "$MyServerId" ]; then
+		GET "/servers/$MyServerId/issues/"
+		return $?
+	else
+		echo "No Server ID for $1" >&2
+		echo '{}'
+		return 1
+	fi
+}
+
+
+ListServerIPs () {
+#Params:
+#	[--show-host]		Show the hostname in the first column of each line
+#	[--show-interface]	Put the interface name just before each IP address: eth4/1.2.3.4
+#	ServerName		Server for which you want addresses
+#Sample call:		ListServerIPs starling
+#Returns: one line per server:
+#	[ServerName] [Connecting_IP_Address]/ConnectingIP [IfName1]/IPAddr1 [IfName2]/IPAddr2 ...
+#Return code is 0 if info available for all servers, 1 otherwise
+
+	ShowHost=''
+	ShowInterface=''
+	ServerList=''
+	while [ -n "$1" ]; do
+		case "$1" in
+		--show-host)
+			ShowHost='yes'
+			;;
+		--show-interface)
+			ShowInterface='yes'
+			;;
+		*)
+			ServerList="$ServerList
+$1"
+			;;
+		esac
+		shift
+	done
+
+	RetCode=0
+
+	for ServerName in $ServerList ; do
+		MyServerId="`IdOfServer \"$ServerName\"`"
+		if [ -n "$MyServerId" ]; then
+			ServerDetails="`GET "/servers/$MyServerId"`"
+
+			if [ -n "$ShowHost" ]; then
+				Hostname=`echo "$ServerDetails" | jsawk 'return this.server.hostname'`
+			        echo -n "$Hostname "
+			fi
+			ConnectingIP=`echo "$ServerDetails" | jsawk 'return this.server.connecting_ip_address'`
+			if [ -n "$ShowInterface" ]; then
+				echo -n "Connecting_IP_Address/"
+			fi
+			echo -n "$ConnectingIP "
+
+			NumOfInterfaces=`echo "$ServerDetails" | jsawk 'return this.server.interfaces.length'`
+			for IId in `seq 0 $[$NumOfInterfaces - 1]` ; do
+				if [ -n "$ShowInterface" ]; then
+					IFName=`echo "$ServerDetails" | jsawk "return this.server.interfaces[$IId].name"`
+					echo -n "$IFName/"
+				fi
+				IP=`echo "$ServerDetails" | jsawk "return this.server.interfaces[$IId].ip_address"`
+				echo -n "$IP "
+			done
+			echo
+		else
+			echo "No Server ID for $ServerName" >&2
+			RetCode=1
+		fi
+	done
+	return $RetCode
+}
+
+
+ExtractIssue () {
+#$1: Name of the issue you want (the value following 'rule_name: '
+#stdin: The json of all server issues (the output of ServerIssues is fine)
+#Sample call:		ServerIssues starling | ExtractIssue "Disable root login via SSH"
+#(hint: to see just the status, pipe the output to  "... | jsawk 'return this.status'  ")
+#Return code: true if found, false if not
+	AllIssues="`cat`"
+	RetCode=1
+	NumIssues=`echo "$AllIssues" | jsawk 'return this.sca.findings.length'`
+	for IId in `seq 0 $[$NumIssues - 1]` ; do
+#		echo "$AllIssues" | jsawk "if (this.sca.findings[$IId].rule_name == '$1') return this.sca.findings[$IId]; else return null"
+		if [ "`echo \"$AllIssues\" | jsawk \"return this.sca.findings[$IId].rule_name\"`" = "$1" ]; then
+			RetCode=0
+			echo "$AllIssues" | jsawk "return this.sca.findings[$IId]"
+		fi
+	done
+	return $RetCode
+}
+
+
+SCAToCEF () {
+#Params: server(s) from which to pull
+#Output: one line per issue in CEF format
+
+	for OneServer in "$@" ; do
+		Issues=$(GET /servers/`IdOfServer $OneServer`/issues/)
+		#FIXME - merge return codes from all pulls
+		RetCode=$?
+
+		ScaCount=`echo "$Issues" | jsawk 'return this.sca.findings.length'`
+		for SId in `seq 0 $[$ScaCount - 1]` ; do
+			ThisIssue=`echo "$Issues" | jsawk "return this.sca.findings[$SId]"`
+			RuleName=`echo "$ThisIssue" | jsawk 'return this.rule_name' | sed -e 's/ /_/g' | tr -dc '[[:alnum:]_]'`
+			if [ "`echo \"$ThisIssue\" | jsawk 'return this.critical'`" = "true" ]; then
+				Severity=8
+			else
+				Severity=2
+			fi
+
+			echo "CEF:0|CloudPassage|HaloPortal|4A|100|ConfigVulnerability|$Severity|msg=$RuleName|dhost=$OneServer|outcome=failure|CloudPassageHaloPortalSCADetails=$ThisIssue"
+		done
+
+	done
+
+	return $RetCode
+}
+
+
+SVMToCEF () {
+#Params: server(s) from which to pull
+#Output: one line per issue in CEF format
+
+	for OneServer in "$@" ; do
+		Issues=$(GET /servers/`IdOfServer $OneServer`/issues/)
+		#FIXME - merge return codes from all pulls
+		RetCode=$?
+
+		SvmCount=`echo "$Issues" | jsawk 'return this.svm.findings.length'`
+		for SId in `seq 0 $[$SvmCount - 1]` ; do
+			ThisIssue=`echo "$Issues" | jsawk "return this.svm.findings[$SId]"`
+			PackageName=`echo "$ThisIssue" | jsawk 'return this.package_name' | sed -e 's/ /_/g'`
+			PackageVersion=`echo "$ThisIssue" | jsawk 'return this.package_version' | sed -e 's/ /_/g'`
+			if [ "`echo \"$ThisIssue\" | jsawk 'return this.critical'`" = "true" ]; then
+				Severity=8
+			else
+				Severity=2
+			fi
+			echo "CEF:0|CloudPassage|HaloPortal|4A|100|SoftwareVulnerability|$Severity|msg=${PackageName}-${PackageVersion}|dhost=$OneServer|outcome=failure|CloudPassageHaloPortalSVMDetails=$ThisIssue"
+		done
+	done
+
+	return $RetCode
+}
+
+
+#================ Configuration Policy API functions ================
+
+
+IdOfConfigurationPolicy () {
+#Sample call:		IdOfConfigurationPolicy Test1GP
+	AllPolicies="`GET /policies/`"
+	RetCode=$?
+	NumPolicies=`echo "$AllPolicies" | jsawk 'return this.policies.length'`
+	for CId in `seq 0 $[$NumPolicies - 1]` ; do
+		echo "$AllPolicies" | jsawk "if (this.policies[$CId].name == '$1') return this.policies[$CId].id; else return null"
+	done
+	return $RetCode
+}
+
+
+#================ Firewall Policy API functions ================
+
+
+AllFirewallPolicyIds () {
+#Sample call:		AllFirewallPolicyIds
+	AllPolicies="`GET /firewall_policies`"
+	RetCode=$?
+	NumPolicies=`echo "$AllPolicies" | jsawk 'return this.firewall_policies.length'`
+	for FId in `seq 0 $[$NumPolicies - 1]` ; do
+		echo "$AllPolicies" | jsawk "return this.firewall_policies[$FId].id"
+	done | uniq
+	return $RetCode
+}
+
+
+CreatePolicy () {
+#$1: Name of firewall policy to create
+#$2: Description
+#Sample call:		CreatePolicy fwp-deleteme1 fwp-deleteme1-description
+#no output
+	PostOut=$(echo '{"firewall_policy":{"name":"'"$1"'","description":"'"$2"'"}}' | POST /firewall_policies --verbose 2>&1)
+	RetCode=$?
+	#Location=$(echo "$PostOut" | grep '^< Location: ' | sed -e 's/^< Location: //')
+	#echo "CreatePolicy: returned location is $Location" >&2
+	#Sample:		https://sandbox.cloudpassage.com/api/1/firewall_policies/b7949ec092db012ed50b40409a8ae098
+	return $RetCode
+}
+
+
+DeletePolicy () {
+#$1: Name of policy to delete
+#Sample call:		DeletePolicy fwp-deleteme2
+	MyPolicyId="`IdOfPolicy $1`"
+	if [ -n "$MyPolicyId" ]; then
+		DELETE "/firewall_policies/$MyPolicyId"
+		return $?
+	else
+		echo "No Policy ID for $1" >&2
+		#No need to return a json object
+		return 1
+	fi
+
+	#echo "No apparent API or web interface for deleting firewall policies at the moment."
+	#return 1
+}
+
+
+IdOfPolicy () {
+#Sample call:		IdOfPolicy fwp-deleteme1
+	AllPolicies="`GET /firewall_policies`"
+	RetCode=$?
+	NumPolicies=`echo "$AllPolicies" | jsawk 'return this.firewall_policies.length'`
+	for FId in `seq 0 $[$NumPolicies - 1]` ; do
+		echo "$AllPolicies" | jsawk "if (this.firewall_policies[$FId].name == '$1') return this.firewall_policies[$FId].id; else return null"
+	done
+	return $RetCode
+}
+
+
+GetPolicyDetails () {
+#$1: Name of policy for which you want details
+#Sample call:		GetPolicyDetails fwp-deleteme1
+#Returns: json object with policy details
+	MyPolicyId="`IdOfPolicy \"$1\"`"
+	if [ -n "$MyPolicyId" ]; then
+		GET "/firewall_policies/$MyPolicyId"
+		return $?
+	else
+		echo "No Group ID for $1" >&2
+		echo '{}'
+		return 1
+	fi
+}
+
+
+UpdatePolicy () {
+#STDIN: Feed json object with updated information on stdin
+#Sample call:		GetPolicyDetails fwp-deleteme1 |  jsawk 'this.firewall_policy.description = "new description"' | UpdatePolicy fwp-deleteme1
+#$1: Name of policy you wish to update
+	MyPolicyId="`IdOfPolicy \"$1\"`"
+	if [ -n "$MyPolicyId" ]; then
+		PUT "/firewall_policies/$MyPolicyId"
+		return $?
+	else
+		echo "No Policy ID for $1" >&2
+		#No need to return a json object
+		return 1
+	fi
+}
+
+
+#================ Firewall Rule API functions ================
+
+
+AllRuleIdsForPolicy () {
+#$1: policy for which you want the rules
+#Sample call:		AllRuleIds fwp-deleteme2
+#Sample output:
+#		19c4265092bd012ed50840409a8ae098
+#		5eeecde092bd012ed50840409a8ae098
+#		716ad36092be012ed50840409a8ae098
+#		bc193a9092bc012ed50840409a8ae098
+	MyPolicyId="`IdOfPolicy \"$1\"`"
+	if [ -n "$MyPolicyId" ]; then
+		AllRules="`GET /firewall_policies/$MyPolicyId/firewall_rules/`"
+		RetCode=$?
+		NumRules=`echo "$AllRules" | jsawk 'return this.firewall_rules.length'`
+		for RId in `seq 0 $[$NumRules - 1]` ; do
+			echo "$AllRules" | jsawk "return this.firewall_rules[$RId].id"
+		done \
+		 | sed -e 's/\[//g' -e 's/\]//g' -e 's/, */\n/g' -e 's/  */\n/g' \
+		 | sort -u
+		return $RetCode
+	else
+		echo "No Policy ID for $1" >&2
+		#No need to return a json object
+		return 1
+	fi
+}
+
+
+AllFirewallRulesForPolicy () {
+#$1: name of the policy for which you want a rule listing
+#Sample call:		AllFirewallRulesForPolicy fwp-deleteme1
+	MyPolicyId="`IdOfPolicy \"$1\"`"
+	if [ -n "$MyPolicyId" ]; then
+		GET "/firewall_policies/$MyPolicyId/firewall_rules/"
+		return $?
+	else
+		echo "No Policy ID for $1" >&2
+		echo '{}'
+		return 1
+	fi
+}
+
+
+IdOfRule () {
+	#Ummm.  OK, I _have_ to see those headers.
+	:
+}
+
+
+CreateRule () {
+#$1: Name of firewall policy in which to place the rule
+#Remaining parameters are the firewall parameters to hand in.
+#Sample call:		CreateRule fwp-deleteme1 [firewall_param]...
+#Params are: INPUT OUTPUT NEW ESTABLISHED RELATED ACCEPT DROP REJECT
+#ACTIVE INACTIVE LOG eth* lo ppp* em* tun* tap* 1-99999 NamedInterface
+#NamedZone NamedGroup NamedService
+#Order of params does not matter, except that if two params conflict
+#the latter overrides the former.
+#stdout: the UUID of the new firewall rule, which appears to be difficult to get any other way
+	RequestedPolicy="$1"
+	shift
+	MyPolicyId="`IdOfPolicy \"$RequestedPolicy\"`"
+	if [ -n "$MyPolicyId" ]; then
+		PostOut=$(ConstructNewRuleObject "$@" | POST "/firewall_policies/$MyPolicyId/firewall_rules/" --verbose 2>&1)
+		RetCode=$?
+		Location=$(echo "$PostOut" | grep '^< Location: ' | sed -e 's/^< Location: //')
+		#echo "CreateRule: returned location is $Location" >&2
+		#Sample:		https://sandbox.cloudpassage.com/api/1/firewall_policies/51d28a308d71012ed4f240409a8ae098/firewall_rules/4bb9414092db012ed50b40409a8ae098
+
+		#Return the new firewall rule UUID in stdout, which is different from the other Create* calls.
+		echo "$Location" | sed -e 's@.*/@@' | tr -d -c 0-9a-f		#tr call needed because there appears to still be a CR in there.  Sorry Vitaliy. :-)
+		return $RetCode
+	else
+		echo "No policy ID for $1" >&2
+		#No need to return a json object
+		return 1
+	fi
+}
+
+
+DeleteRule () {
+#$1: Name of policy holding the firewall rule
+#$2: NOTE! The firewall rule _ID_ to delete from that policy
+#Sample call:		DeleteRule fwp-deleteme2 {Rule_id_string}
+	MyPolicyId="`IdOfPolicy \"$1\"`"
+	if [ -n "$MyPolicyId" ]; then
+		DELETE "/firewall_policies/$MyPolicyId/firewall_rules/$2"
+		return $?
+	else
+		echo "No Policy ID for $1" >&2
+		#No need to return a json object
+		return 1
+	fi
+}
+
+
+GetRuleDetails () {
+#$1: Name of policy that holds the rules for which you want details
+#$2: NOTE! The firewall rule _ID_ to delete from that policy
+#Sample call:		GetRuleDetails fwp-deleteme2 {Rule_id_string}
+#Returns: json object with rule details
+	MyPolicyId="`IdOfPolicy \"$1\"`"
+	if [ -n "$MyPolicyId" ]; then
+		GET "/firewall_policies/$MyPolicyId/firewall_rules/$2"
+		return $?
+	else
+		echo "No Policy ID for $1" >&2
+		echo '{}'
+		return 1
+	fi
+}
+#Careful; api returns json objects for both non-existant and existing rules, respectively:
+#[wstearns@starling api]$ GetRuleDetails fwp-deleteme2 1e42d91092df012ed50b40409a8ae098
+#{"field":"id","value":"1e42d91092df012ed50b40409a8ae098","resource":"firewall_rule"}
+#[wstearns@starling api]$ GetRuleDetails fwp-deleteme2 a07e20e092df012ed50b40409a8ae098
+#{"firewall_rule":{"log":true,"active":true,"connection_states":"NEW, RELATED","action":"drop","chain":"input","id":"a07e20e092df012ed50b40409a8ae098"}}
+
+
+UpdateRule () {
+#STDIN: Feed json object with updated information on stdin
+#Sample call:		GetRuleDetails fwp-deleteme2 {Rule_id_string} | jsawk 'this.firewall_rule.active = "false"' | UpdateRule fwp-deleteme2 {Rule_id_string}
+#$1: Name of firewall policy holding the firewall rule you wish to update
+#$2: Firewall rule _UUID_
+	MyPolicyId="`IdOfPolicy \"$1\"`"
+	if [ -n "$MyPolicyId" ]; then
+		PUT "/firewall_policies/$MyPolicyId/firewall_rules/$2"
+		return $?
+	else
+		echo "No Policy ID for $1" >&2
+		#No need to return a json object
+		return 1
+	fi
+}
+
+
+ConstructNewRuleObject () {
+#Creates a new json object to hand to CreateRule's POST command.  This is 
+#automatically called from CreateRule; you should not have to call this
+#directly.  Call it directly if you want to see the json object created.
+#If conflicting options ("... ACCEPT ... DROP ...") are passed, the last one wins.
+
+#FIXME - this silently ignores Services (like "ldap") handed as a param.  Does seem to
+#handle interfaces correctly.  Not sure about zones or groups
+
+	unset Action ConnStates Established FirewallInterface FirewallOtherEnd FirewallService Position New Related Type
+	Log='false'
+	Chain='INPUT'
+	Active='true'
+	Position='last'		#This is the way to specify append.  Position is required, so we put this in as a default
+
+	while [ -n "$1" ]; do
+		case "$1" in
+		INPUT|input)			Chain="input"			;;
+		OUTPUT|output)			Chain="output"			;;
+		NEW|new)			New="NEW"			;;
+		ESTABLISHED|established)	Established="ESTABLISHED"	;;
+		RELATED|related)		Related="RELATED"		;;
+		ACCEPT|accept)			Action="accept"			;;
+		DROP|drop)			Action="drop"			;;
+		REJECT|reject)			Action="reject"			;;
+		ACTIVE|active)			Active='true'			;;
+		INACTIVE|inactive)		Active='false'			;;
+		LOG|log)			Log='true'			;;
+		eth[0-9]|eth[0-9][0-9]|lo|ppp[0-9]|ppp[0-9][0-9]|em[0-9]|em[0-9][0-9]|tun[0-9]|tun[0-9][0-9]|tap[0-9]|tap[0-9][0-9])
+			if TestInterface=`IdOfInterface "$1"` ; then
+				FirewallInterface="$TestInterface"
+			else
+				echo "Unknown interface $1, you should create an interface first, skipping."
+			fi
+			;;
+		[1-9]|[0-9][0-9]|[0-9][0-9][0-9]|[0-9][0-9][0-9][0-9]|[0-9][0-9][0-9][0-9][0-9])
+			Position="$1"
+			;;
+		*)
+			if TestInterface=`IdOfInterface "$1"` ; then
+				FirewallInterface="$TestInterface"
+			elif TestZone=`IdOfZone "$1"` ; then
+				FirewallOtherEnd="$TestZone"
+				Type='FirewallZone'
+			elif TestGroup=`IdOfGroup "$1"` ; then
+				FirewallOtherEnd="$TestGroup"
+				Type='Group'
+			elif TestService=`IdOfService "$1"` ; then
+				FirewallService="$TestService"
+			else
+				echo "Firewall parameter $1 unknown, please create it as an Interface, Zone, Group, or Service first, skipping." >&2
+			fi
+			;;
+		esac
+		shift
+	done
+
+
+	if [ -n "$New" ]; then
+		ConnStates="$New"
+	fi
+	if [ -n "$Established" ]; then
+		if [ -z "$ConnStates" ]; then
+			ConnStates="$Established"
+		else
+			ConnStates="$ConnStates, $Established"
+		fi
+	fi
+	if [ -n "$Related" ]; then
+		if [ -z "$ConnStates" ]; then
+			ConnStates="$Related"
+		else
+			ConnStates="$ConnStates, $Related"
+		fi
+	fi
+
+	echo					'{'
+	echo					'	"firewall_rule" : {'
+	echo 					'		"chain":"'"$Chain"'",'
+	echo 					'		"active":"'"$Active"'",'
+	if [ -n "$FirewallInterface" ]; then
+		echo 				'		"firewall_interface":"'"$FirewallInterface"'",'
+	fi
+	if [ -n "$FirewallOtherEnd" ]; then
+		if [ "$Chain" = "input" ]; then
+			echo 			'		"firewall_source":"'"$FirewallOtherEnd"'",'
+			echo 			'		"type":"'"$Type"'",'
+		elif [ "$Chain" = "output" ]; then
+			echo 			'		"firewall_target":"'"$FirewallOtherEnd"'",'
+			echo 			'		"type":"'"$Type"'",'
+		else
+			echo "Unknown chain $Chain" >&2
+		fi
+	fi
+	if [ -n "$FirewallService" ]; then
+		echo				'		"firewall_service":"'"$FirewallService"'",'
+	fi
+	if [ -n "$ConnStates" ]; then
+		echo				'		"connection_states":"'"$ConnStates"'",'
+	else
+		echo				'		"connection_states":null,'
+	fi
+	if [ -n "$Position" ]; then
+		echo				'		"position":"'"$Position"'",'
+	fi
+	echo					'		"action":"'"$Action"'",'
+	#We place "log" last since every rule will have it and we need a field to not have a trailing comma
+	echo					'		"log":"'"$Log"'"'
+	echo					'	}'
+	echo					'}'
+}
+
+
+#================ Firewall Interface API functions ================
+
+
+IdOfInterface () {
+#Sample call:		IdOfInterface any
+	AllInterfaces="`GET /firewall_interfaces/`"
+	RetCode=$?
+	NumInterfaces=`echo "$AllInterfaces" | jsawk 'return this.firewall_interfaces.length'`
+	for IId in `seq 0 $[$NumInterfaces - 1]` ; do
+		echo "$AllInterfaces" | jsawk "if (this.firewall_interfaces[$IId].name == '$1') return this.firewall_interfaces[$IId].id; else return null"
+	done
+	return $RetCode
+}
+
+
+CreateInterface () {
+#$1: Name of interface to create
+#Sample call:		CreateInterface eth5
+#no output
+	PostOut=$(echo '{"firewall_interface":{"name":"'"$1"'"}}' | POST /firewall_interfaces --verbose 2>&1)
+	RetCode=$?
+	#Location=$(echo "$PostOut" | grep '^< Location: ' | sed -e 's/^< Location: //')
+	#echo "CreateInterface: returned location is $Location" >&2
+	#Sample:		https://sandbox.cloudpassage.com/api/1/firewall_interfaces/50e3081092db012ed50b40409a8ae098
+	return $RetCode
+}
+
+
+DeleteInterface () {
+#$1: Name of interface to delete
+#Sample call:		DeleteInterface eth5
+	MyInterfaceId="`IdOfInterface \"$1\"`"
+	if [ -n "$MyInterfaceId" ]; then
+		DELETE "/firewall_interfaces/$MyInterfaceId"
+		return $?
+	else
+		echo "No interface ID for $1" >&2
+		#No need to return a json object
+		return 1
+	fi
+}
+
+
+GetInterfaceDetails () {
+#$1: Name of interface for which you want details
+#Sample call:		GetInterfaceDetails eth5
+#Returns: json object with interface details
+	MyInterfaceId="`IdOfInterface \"$1\"`"
+	if [ -n "$MyInterfaceId" ]; then
+		GET "/firewall_interfaces/$MyInterfaceId"
+		return $?
+	else
+		echo "No interface ID for $1" >&2
+		echo '{}'
+		return 1
+	fi
+}
+
+
+#================ Firewall Service API functions ================
+
+
+CreateService () {
+#$1: Name of firewall service to create
+#$2: Protocol (ICMP, UDP, or TCP)
+#$3: Port
+#Sample call:		CreateService AuthPort tcp 20116
+#no output
+	PostOut=$(echo '{"firewall_service":{"name":"'"$1"'","protocol":"'"$2"'","port":"'"$3"'"}}' | POST /firewall_services --verbose 2>&1)
+	RetCode=$?
+	#Location=$(echo "$PostOut" | grep '^< Location: ' | sed -e 's/^< Location: //')
+	#echo "CreateService: returned location is $Location" >&2
+	#Sample:		https://sandbox.cloudpassage.com/api/1/firewall_services/58ade54092db012ed50b40409a8ae098
+	return $RetCode
+}
+
+
+IdOfService () {
+#Sample call:		IdOfService AuthPort
+	AllServices="`GET /firewall_services/`"
+	RetCode=$?
+	NumServices=`echo "$AllServices" | jsawk 'return this.firewall_services.length'`
+	for SId in `seq 0 $[$NumServices - 1]` ; do
+		echo "$AllServices" | jsawk "if (this.firewall_services[$SId].name == '$1') return this.firewall_services[$SId].id; else return null"
+	done
+	return $RetCode
+}
+
+
+DeleteService () {
+#$1: Name of firewall service to delete
+#Sample call:		DeleteService AuthPort
+	MyServiceId="`IdOfService \"$1\"`"
+	if [ -n "$MyServiceId" ]; then
+		DELETE "/firewall_services/$MyServiceId"
+		return $?
+	else
+		echo "No service ID for $1" >&2
+		#No need to return a json object
+		return 1
+	fi
+}
+
+
+GetServiceDetails () {
+#$1: Name of service for which you want details
+#Sample call:		GetServiceDetails AuthPort
+#Returns: json object with service details
+	MyServiceId="`IdOfService \"$1\"`"
+	if [ -n "$MyServiceId" ]; then
+		GET "/firewall_services/$MyServiceId"
+		return $?
+	else
+		echo "No service ID for $1" >&2
+		echo '{}'
+		return 1
+	fi
+}
+
+
+#================ Firewall Zone API functions ================
+
+
+AllZoneIds () {
+#No parameters
+#Sample call:		AllZoneIds
+#Sample output:
+#		"980c5d208a5c012ed4f040409a8ae098"
+#		"bcfc4f508f12012ed4f740409a8ae098"
+	AllZones="`GET /firewall_zones/`"
+	RetCode=$?
+	NumZones=`echo "$AllZones" | jsawk 'return this.firewall_zones.length'`
+	for ZId in `seq 0 $[$NumZones - 1]` ; do
+		echo "$AllZones" | jsawk "return this.firewall_zones[$ZId].id"
+	done \
+	 | sed -e 's/\[//g' -e 's/\]//g' -e 's/, */\n/g' \
+	 | sort -u
+	return $RetCode
+}
+
+
+IdOfZone () {
+#$1: Name of Zone for which you want an ID
+#Sample call:		IdOfZone any
+#Sample output:
+#		143504b07061012ed4eb40409a8ae098
+	AllZones="`GET /firewall_zones`"
+	RetCode=$?
+	NumZones=`echo "$AllZones" | jsawk 'return this.firewall_zones.length'`
+	for ZId in `seq 0 $[$NumZones - 1]` ; do
+		echo "$AllZones" | jsawk "if (this.firewall_zones[$ZId].name == '$1') return this.firewall_zones[$ZId].id; else return null"
+	done
+	return $RetCode
+}
+
+
+CreateZone () {
+#$1: Name of zone to create
+#$2: IP/subnet to use in zone (or multiple ips/cidrs comma separated)
+#Sample call:		CreateZone WestCoastDns "10.11.12.13,10.11.12.14"
+#no output
+	PostOut=$(echo '{"firewall_zone":{"name":"'"$1"'","ip_address":"'"$2"'"}}' | POST /firewall_zones --verbose 2>&1)
+	RetCode=$?
+	#Location=$(echo "$PostOut" | grep '^< Location: ' | sed -e 's/^< Location: //')
+	#echo "CreateZone: returned location is $Location" >&2
+	#Sample:		https://sandbox.cloudpassage.com/api/1/firewall_zones/6156e89092db012ed50b40409a8ae098
+	return $RetCode
+}
+
+
+DeleteZone () {
+#$1: Name of zone to delete
+#Sample call:		DeleteZone WestCoastDns
+	MyZoneId="`IdOfZone \"$1\"`"
+	if [ -n "$MyZoneId" ]; then
+		DELETE "/firewall_zones/$MyZoneId"
+		return $?
+	else
+		echo "No Zone ID for $1" >&2
+		#No need to return a json object
+		return 1
+	fi
+}
+
+
+GetZoneDetails () {
+#$1: Name of zone for which you want details
+#Returns: json object with zone details
+#Sample call:		GetZoneDetails WestCoastDns
+	MyZoneId="`IdOfZone \"$1\"`"
+	if [ -n "$MyZoneId" ]; then
+		GET "/firewall_zones/$MyZoneId"
+		return $?
+	else
+		echo "No zone ID for $1" >&2
+		echo '{}'
+		return 1
+	fi
+}
+
+
+UpdateZone () {
+#(not implemented in current API)
+#$1: Name of zone you wish to update
+#STDIN: Feed json object with updated information on stdin
+#Sample call:		GetZoneDetails WestCoastDns \
+#			| jsawk 'this.firewall_zone.ip_address = "10.11.12.13,10.11.12.14,10.11.12.15"' \
+#			| jsawk "delete this.firewall_zone.id" \
+#			| UpdateZone WestCoastDns
+	MyZoneId="`IdOfZone \"$1\"`"
+	if [ -n "$MyZoneId" ]; then
+		PUT "/firewall_zones/$MyZoneId"
+		return $?
+	else
+		echo "No zone ID for $1" >&2
+		#No need to return a json object
+		return 1
+	fi
+}
+
+
+
+
+
+
+
+

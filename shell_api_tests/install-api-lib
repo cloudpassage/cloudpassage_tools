@@ -1,0 +1,172 @@
+#!/bin/bash
+#Copyright 2012, William Stearns <wstearns@pobox.com> and
+#CloudPassage.
+#
+#Use: download this script and api-lib itself to a system,
+#run "chmod 755 install-api-lib", and "./install-api-lib"
+
+
+#FIXME - make an update-blocklist
+
+status () {
+	echo "==== $*" >&2
+}
+
+InstallPkg () {
+#$1: binary we hope is available in the path
+#$2 and beyond: name of the package(s) that may provide the binary, preferred first
+	Binary="$1"
+	shift
+	if type -path "$Binary" >/dev/null ; then
+		echo "$Binary installed, good, continuing" >&2
+	else
+		echo "$Binary not installed, attempting to install." >&2
+		while [ -n "$1" ]; do 
+			if ! type -path "$Binary" >/dev/null ; then
+				if type -path yum >/dev/null ; then
+					$Sudo yum -y install "$1"
+				elif type -path apt-get >/dev/null ; then
+					$Sudo apt-get update
+					$Sudo apt-get install "$1"
+				else
+					echo "Can't locate yum or apt-get.  Please manually install the package" >&2
+					echo "$1 , or another package that provides the program $Binary ." >&2
+				fi
+			fi
+			shift
+		done
+	fi
+}
+
+if [ "$UID" != 0 ]; then
+	export Sudo='sudo'
+	if type -path sudo >/dev/null 2>&1 ; then
+		echo 'As you are running as a non-root user, I will attempt to use sudo for privileged' >&2
+		echo "commands.  If these fail, please give sudo permissions to `whoami` for" >&2
+		echo "the following commands: yum, apt-get, rpm, cp, mv, and chmod.">&2
+	else
+		echo 'You are not running this script as root and sudo is not available to run' >&2
+		echo 'privileged commands.  Please rerun this as root or install and configure' >&2
+		echo 'sudo.  Exiting.' >&2
+		exit 1
+	fi
+fi
+
+if ! echo "$PATH" | grep -q '/usr/local/bin' ; then
+	export PATH="$PATH:/usr/local/bin/"
+	WarnPath='yes'
+fi
+
+
+case `rpm -q centos-release 2>/dev/null` in
+centos-release-5*)
+	echo "Installing EPEL repository to provide js on Centos 5"
+	$Sudo rpm -Uvh http://dl.fedoraproject.org/pub/epel/5/i386/epel-release-5-4.noarch.rpm
+	;;
+centos-release-6*)
+	echo "Installing EPEL repository to provide js on Centos 6"
+	$Sudo rpm -Uvh http://dl.fedoraproject.org/pub/epel/6/i386/epel-release-6-5.noarch.rpm >/dev/null
+	;;
+esac
+
+status Installing support packages
+
+InstallPkg curl		curl
+InstallPkg html2text	html2text
+InstallPkg lynx		lynx
+InstallPkg vim		vim-enhanced
+InstallPkg sudo		sudo
+InstallPkg js		js
+
+if [ ! -x /usr/local/bin/api-lib ]; then
+	#Test api-lib in local dir
+	if [ -s ./api-lib ]; then
+		$Sudo cp -p api-lib /usr/local/bin/api-lib
+	else
+		echo "There doesn't seem to be an api-lib in the current directory." >&2
+		echo "Please download it to the current directory and re-run this installer," >&2
+		echo "or place directly in /usr/local/bin/ and make it executable with:" >&2
+		echo "chmod 755 /usr/local/bin/api-lib" >&2
+	fi
+fi
+
+if [ ! -x /usr/local/bin/jsawk ]; then
+	export TF=`mktemp -q /tmp/jsawk.XXXXXX </dev/null` && \
+	curl -k -L http://github.com/micha/jsawk/raw/master/jsawk >"$TF" && \
+	if [ ! -e /usr/local/bin/jsawk ]; then
+		#mv's "-n" param isn't in all mv's
+		$Sudo mv "$TF" /usr/local/bin/jsawk
+	fi
+	rm -f "$TF"
+fi
+if [ ! -x /usr/local/bin/resty ]; then
+	export TF=`mktemp -q /tmp/resty.XXXXXX </dev/null` && \
+	curl -k -L http://github.com/micha/resty/raw/master/resty >"$TF" && \
+	#Applying patch to resty to fix a missing return code
+	cat <<EOF | patch "$TF"
+--- resty.20110923	2012-02-02 13:48:40.060613635 -0500
++++ resty	2012-02-02 13:57:21.828126541 -0500
+@@ -102,6 +102,7 @@
+         return \$ret
+       else
+         [ -n "\$out" ] && echo "\$out"
++        return 0
+       fi
+       ;;
+     http://*|https://*)
+EOF
+	if [ ! -e /usr/local/bin/resty ]; then
+		#mv's "-n" param isn't in all mv's
+		$Sudo mv "$TF" /usr/local/bin/resty
+	fi
+	rm -f "$TF"
+fi
+$Sudo chmod 755 /usr/local/bin/{api-lib,jsawk,resty}
+
+
+if [ ! -d ~/.resty ]; then
+	mkdir ~/.resty
+	chmod 700 ~/.resty
+fi
+
+if [ ! -r ~/.resty/portal.cloudpassage.com ]; then
+	touch ~/.resty/portal.cloudpassage.com
+	chmod 700 ~/.resty/portal.cloudpassage.com
+
+	echo 'Please enter your API key.  If you choose not to enter it now, just'
+	echo 'press enter, and later edit ~/.resty/portal.cloudpassage.com and replace'
+	echo 'all YourApiKey blocks with the actual API key.'
+	echo 'Your API key can be found in the portal under Settings->Site Administration->API Keys'
+	read ApiKey
+	if [ -z "$ApiKey" ]; then
+		ApiKey='YourApiKey'
+	fi
+
+	#Quotes do make it down into the file
+	cat <<EOTEXT >>~/.resty/portal.cloudpassage.com
+DELETE -H "x-cpauth-access: $ApiKey" -H "Content-Type: application/json"
+GET -H "x-cpauth-access: $ApiKey" -H "Content-Type: application/json"
+POST -H "x-cpauth-access: $ApiKey" -H "Content-Type: application/json"
+PUT -H "x-cpauth-access: $ApiKey" -H "Content-Type: application/json"
+EOTEXT
+fi
+
+
+for Binary in curl html2text lynx vim sudo js jsawk resty api-lib ; do
+	if ! type -path "$Binary" >/dev/null 2>&1 ; then
+		Missing="$Missing $Binary"
+	fi
+done
+if [ -n "$Missing" ]; then
+	echo "The following tool(s) was/were not successfully installed - you may" >&2
+	echo "have to install them by hand: $Missing" >&2
+fi
+
+if [ -n "$WarnPath" ]; then
+	echo 'It appears /usr/local/bin is not part of your path; you will need to run' >&2
+	echo 'the following command in each shell where you run api commands and' >&2
+	echo 'at the top of any api shell scripts:' >&2
+	echo 'export PATH="$PATH:/usr/local/bin/"' >&2
+fi
+
+

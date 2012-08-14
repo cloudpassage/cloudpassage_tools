@@ -1,0 +1,67 @@
+#!/bin/bash
+
+#. /home/wstearns/med/cloudpassage/api/api-lib
+. /usr/local/bin/api-lib
+resty 'https://portal.cloudpassage.com/api/1*'
+
+#The following blocks are independent examples of how to accomplish account
+#tasks using the Halo API.  Most use the API.
+
+
+
+echo "Here's a list the names of the servers in the 'Test CentOS-6, RHEL, Fedora' group"
+ActiveHostnamesInGroup 'Test CentOS-6, RHEL, Fedora'
+
+
+
+#Show accounts on all systems
+for OneServer in `ActiveHostnamesInGroup 'Test CentOS-6, RHEL, Fedora'` ; do
+	echo "======== $OneServer"
+	ActiveAccountsOnServer "$OneServer" | tr '\n' ',' | sed -e 's/,$/\n/'
+done
+
+
+
+#Example of taking an action for each account on each machine in that group
+#If you only want to preform the actions on specific machines, just replace
+#	`ActiveHostnamesInGroup 'Test CentOS-6, RHEL, Fedora'`
+#with the space separated name(s) of the machines (use the hostnames as they
+#are displayed on the portal).
+for OneServer in `ActiveHostnamesInGroup 'Test CentOS-6, RHEL, Fedora'` ; do
+	echo "======== $OneServer"
+	for OneAccount in `ActiveAccountsOnServer "$OneServer"` ; do
+		echo "== $OneAccount"
+
+		#This just shows the individual account settings for the account in json format.
+		#Add "| pretty_print.rb" if you have that pretty printer script to format nicely
+		GET /servers/`IdOfServer "$OneServer"`/accounts/"$OneAccount"
+	done
+done
+
+
+
+
+#Example of taking an action for specific accounts on each machine in that group
+for OneServer in `ActiveHostnamesInGroup 'Test CentOS-6, RHEL, Fedora'` ; do
+	echo "======== $OneServer"
+	#Put as many accounts as you want to affect between "in" and ";", space separated.
+	for OneAccount in zparker ; do
+		echo "== $OneAccount"
+
+		#Create that account - uncomment the following 2 lines to do that
+		#echo '{"account":{"username":"'"$OneAccount"'","comment":"User '"$OneAccount"'","groups":"wheel,users","password":{"length":10,"include_special":true,"include_numbers":true,"include_uppercase":true}}}' \
+		# | POST /servers/`IdOfServer "$OneServer"`/accounts
+
+		#Reset the password for that account - uncomment the following 2 lines to do that
+		#echo '{"password":{"length":10,"include_special":true,"include_numbers":true,"include_uppercase":true}}' \
+		# | PUT /servers/`IdOfServer "$OneServer"`/accounts/"$OneAccount"/password
+
+		#Disable the account -  uncomment the following 2 lines to do that
+		#echo '{"account":{"active":false}}' \
+		# | PUT /servers/`IdOfServer "$OneServer"`/accounts/"$OneAccount"
+
+		#Remove the account -  uncomment the following line to do that
+		#DELETE /servers/`IdOfServer "$OneServer"`/accounts/"$OneAccount"
+	done
+done
+

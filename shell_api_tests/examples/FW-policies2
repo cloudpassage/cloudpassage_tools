@@ -1,0 +1,112 @@
+#!/bin/bash
+
+#. /home/wstearns/med/cloudpassage/api/api-lib
+. /usr/local/bin/api-lib
+echo "All tests will be run against:"
+#resty 'https://portal.cloudpassage.com/api/1*'
+#resty https://staging.cloudpassage.com/api/1 -W --insecure
+resty 'https://staging.cloudpassage.com/api/1*'
+
+#Task to complete:
+#Test firewall policy management (CRUD, assign to groups) via API
+
+
+#User modifiable settings.  Please, alphanumeric, dash, and underscore only (no leading dash).
+TestFirewallPolicy="APITestFirewallPolicy-DoNotUse"
+NewDescription="NewDesc"
+TestGroup1='APITestGroup1-DoNotUse'
+TestGroup2='APITestGroup2-DoNotUse'
+
+
+echo '================ Setup ================'
+Header TestAPILive
+if [ "`GetZoneDetails any`" = '{}' ]; then
+	TestFail "We do not seem to be able to successfully make API calls"
+	echo "('GetZoneDetails any' did not return any information).  Please"
+	echo "check: firewall(s), api key in ~/.resty/grid.host.name, api-lib"
+	echo "completely installed, etc.  Exiting."
+	exit 1
+fi
+
+Header CreateGroups
+DeleteGroup "$TestGroup1" >/dev/null 2>&1
+CreateGroup "$TestGroup1"					|| TestFail "Group1 not created"
+DeleteGroup "$TestGroup2" >/dev/null 2>&1
+CreateGroup "$TestGroup2"					|| TestFail "Group2 not created"
+[ -n "`IdOfGroup $TestGroup1`" ]				|| TestFail "Group1 not created (can't find ID)"
+[ -n "`IdOfGroup $TestGroup2`" ]				|| TestFail "Group2 not created (can't find ID)"
+															#echo "$TestGroup1 has group ID `IdOfGroup $TestGroup1`"
+
+
+Header ListGroups
+[ -n "$(AllGroupPolicyIds) | grep `IdOfGroup $TestGroup1`" ]	|| TestFail "Test group1 does not show up in list of groups"
+[ -n "$(AllGroupPolicyIds) | grep `IdOfGroup $TestGroup2`" ]	|| TestFail "Test group2 does not show up in list of groups"
+
+
+
+
+echo '================ Create firewall policy tests ================'
+Header CreateFirewallPolicy
+DeletePolicy "$TestFirewallPolicy" >/dev/null 2>&1
+CreatePolicy "$TestFirewallPolicy" "${TestFirewallPolicy}-description" \
+								|| TestFail "Firewall policy not created"
+Header ListFirewallPolicies
+[ -n "`IdOfPolicy $TestFirewallPolicy`" ]			|| TestFail "Firewall policy not created (can't find ID)"
+															#echo "All Firewall Policies:"
+															#AllFirewallPolicyIds
+															#echo "$TestFirewallPolicy has firewall policy ID `IdOfPolicy $TestFirewallPolicy`"
+
+
+echo '================ Read back firewall policy tests ================'
+Header GetFirewallPolicyDetails
+GetPolicyDetails $TestFirewallPolicy >/dev/null			|| TestFail "Cannot get policy details for $TestFirewallPolicy"
+[ "`GetPolicyDetails $TestFirewallPolicy`" != '{}' ]		|| TestFail "Policy details for $TestFirewallPolicy returned null json object"
+
+
+
+echo '================ Assign firewall policy to groups tests ================'
+Header AssignFirewallPolicy
+echo '{ "group": { "firewall_policy_id": "'"`IdOfPolicy $TestFirewallPolicy`"'" } }' | UpdateGroup "$TestGroup1" \
+								|| TestFail "Cannot assign $TestFirewallPolicy to group $TestGroup1"
+[ "`GetGroupDetails $TestGroup1 | jsawk 'return this.group.firewall_policy_id'`" = "`IdOfPolicy $TestFirewallPolicy`" ] \
+								|| TestFail "Firewall policy $TestFirewallPolicy does not show up in the details for $TestGroup1"
+echo '{ "group": { "firewall_policy_id": "'"`IdOfPolicy $TestFirewallPolicy`"'" } }' | UpdateGroup "$TestGroup2" \
+								|| TestFail "Cannot assign $TestFirewallPolicy to group $TestGroup2"
+[ "`GetGroupDetails $TestGroup2 | jsawk 'return this.group.firewall_policy_id'`" = "`IdOfPolicy $TestFirewallPolicy`" ] \
+								|| TestFail "Firewall policy $TestFirewallPolicy does not show up in the details for $TestGroup2"
+
+
+
+echo '================ Update firewall policy tests ================'
+Header UpdateFirewallPolicy
+GetPolicyDetails "$TestFirewallPolicy" |  jsawk 'this.firewall_policy.description = "'"$NewDescription"'"' | UpdatePolicy "$TestFirewallPolicy"	\
+								|| TestFail "Policy not updated with new description"
+[ "`GetPolicyDetails \"$TestFirewallPolicy\" | jsawk 'return this.firewall_policy.description'`" = "$NewDescription" ] \
+								|| TestFail "Policy not updated with new description on retrieval"
+
+
+
+#This test is currently disabled due to a bug in the API.  When DEV-1712 is resolved, please re-enable these tests.
+#echo '================ Delete firewall policy tests ================'
+#Header DeleteFirewallPolicy
+
+#echo '{ "group": { "firewall_policy_id": null } }' | UpdateGroup "$TestGroup1" \
+#								|| TestFail "Cannot remove firewall policy from group $TestGroup1"
+#echo '{ "group": { "firewall_policy_id": null } }' | UpdateGroup "$TestGroup2" \
+#								|| TestFail "Cannot remove firewall policy from group $TestGroup2"
+##Debug
+##GetGroupDetails "$TestGroup1"
+#DeletePolicy "$TestFirewallPolicy"				|| TestFail "Firewall policy not deleted"
+#[ -z "`IdOfPolicy $TestFirewallPolicy`" ]			|| TestFail "Firewall policy not deleted (ID is still there)"
+
+
+echo '================ Cleanup ================'
+Header DeleteGroup
+DeleteGroup $TestGroup1						|| TestFail "Group1 not deleted"
+[ -z "`IdOfGroup $TestGroup1`" ]				|| TestFail "Group1 not deleted (ID is still there)"
+DeleteGroup $TestGroup2						|| TestFail "Group2 not deleted"
+[ -z "`IdOfGroup $TestGroup2`" ]				|| TestFail "Group2 not deleted (ID is still there)"
+
+
+Header TestsComplete
+
