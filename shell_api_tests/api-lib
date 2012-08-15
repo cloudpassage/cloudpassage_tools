@@ -5,10 +5,7 @@ echo "CloudPassage api-lib version $Version loaded." >&2
 
 #Add Usage for incorrect number of params or "-h" param
 
-. resty 	#https://sandbox.cloudpassage.com/api/1 -W --insecure --verbose
-#This has been moved to run-api-tests
-#echo "All tests will be run against:"
-#resty https://sandbox.cloudpassage.com/api/1 -W --insecure
+. resty
 
 Header () {
 	echo "==== Testing $@"
@@ -186,7 +183,7 @@ CreateGroup () {
 	RetCode=$?
 	#Location=$(echo "$PostOut" | grep '^< Location: ' | sed -e 's/^< Location: //')
 	#echo "CreateGroup: returned location is $Location" >&2
-	#Sample:		https://sandbox.cloudpassage.com/api/1/groups/687a089092db012ed50b40409a8ae098
+	#Sample:		https://portal.cloudpassage.com/api/1/groups/687a089092db012ed50b40409a8ae098
 	return $RetCode
 }
 
@@ -460,7 +457,7 @@ CreatePolicy () {
 	RetCode=$?
 	#Location=$(echo "$PostOut" | grep '^< Location: ' | sed -e 's/^< Location: //')
 	#echo "CreatePolicy: returned location is $Location" >&2
-	#Sample:		https://sandbox.cloudpassage.com/api/1/firewall_policies/b7949ec092db012ed50b40409a8ae098
+	#Sample:		https://portal.cloudpassage.com/api/1/firewall_policies/b7949ec092db012ed50b40409a8ae098
 	return $RetCode
 }
 
@@ -596,7 +593,7 @@ CreateRule () {
 		RetCode=$?
 		Location=$(echo "$PostOut" | grep '^< Location: ' | sed -e 's/^< Location: //')
 		#echo "CreateRule: returned location is $Location" >&2
-		#Sample:		https://sandbox.cloudpassage.com/api/1/firewall_policies/51d28a308d71012ed4f240409a8ae098/firewall_rules/4bb9414092db012ed50b40409a8ae098
+		#Sample:		https://portal.cloudpassage.com/api/1/firewall_policies/51d28a308d71012ed4f240409a8ae098/firewall_rules/4bb9414092db012ed50b40409a8ae098
 
 		#Return the new firewall rule UUID in stdout, which is different from the other Create* calls.
 		echo "$Location" | sed -e 's@.*/@@' | tr -d -c 0-9a-f		#tr call needed because there appears to still be a CR in there.  Sorry Vitaliy. :-)
@@ -800,7 +797,7 @@ CreateInterface () {
 	RetCode=$?
 	#Location=$(echo "$PostOut" | grep '^< Location: ' | sed -e 's/^< Location: //')
 	#echo "CreateInterface: returned location is $Location" >&2
-	#Sample:		https://sandbox.cloudpassage.com/api/1/firewall_interfaces/50e3081092db012ed50b40409a8ae098
+	#Sample:		https://portal.cloudpassage.com/api/1/firewall_interfaces/50e3081092db012ed50b40409a8ae098
 	return $RetCode
 }
 
@@ -849,7 +846,7 @@ CreateService () {
 	RetCode=$?
 	#Location=$(echo "$PostOut" | grep '^< Location: ' | sed -e 's/^< Location: //')
 	#echo "CreateService: returned location is $Location" >&2
-	#Sample:		https://sandbox.cloudpassage.com/api/1/firewall_services/58ade54092db012ed50b40409a8ae098
+	#Sample:		https://portal.cloudpassage.com/api/1/firewall_services/58ade54092db012ed50b40409a8ae098
 	return $RetCode
 }
 
@@ -942,7 +939,7 @@ CreateZone () {
 	RetCode=$?
 	#Location=$(echo "$PostOut" | grep '^< Location: ' | sed -e 's/^< Location: //')
 	#echo "CreateZone: returned location is $Location" >&2
-	#Sample:		https://sandbox.cloudpassage.com/api/1/firewall_zones/6156e89092db012ed50b40409a8ae098
+	#Sample:		https://portal.cloudpassage.com/api/1/firewall_zones/6156e89092db012ed50b40409a8ae098
 	return $RetCode
 }
 

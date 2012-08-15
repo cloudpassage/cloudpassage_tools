@@ -3,9 +3,7 @@
 #. /home/wstearns/med/cloudpassage/api/api-lib
 . /usr/local/bin/api-lib
 echo "All tests will be run against:"
-#resty 'https://portal.cloudpassage.com/api/1*'
-#resty https://staging.cloudpassage.com/api/1 -W --insecure
-resty 'https://staging.cloudpassage.com/api/1*'
+resty 'https://portal.cloudpassage.com/api/1*'
 
 #Task to complete:
 #Test firewall policy management (CRUD, assign to groups) via API
