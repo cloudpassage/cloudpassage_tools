@@ -1,0 +1,3 @@
+# update the hosts file every 30 minutes
+*/30 * * * * root /bin/rm -f /tmp/hosts.$$ ; /bin/cp /etc/hosts.template /tmp/hosts.$$ ; /usr/local/bin/hosts.rb >> /tmp/hosts.$$ ; cat /tmp/hosts.$$ > /etc/hosts ; rm /tmp/hosts.$$
+
