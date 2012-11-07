@@ -5,18 +5,23 @@
 #
 # you may need to say "gem install json" to make this work
 #
-apikey='XXXAPIKEYXXX' 
+clientid = 'XXXXXXXX'
+clientsecret = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' 
+host = 'api.cloudpassage.com'
 
-require 'net/http'
-require 'json/pure'
+require 'oauth2'
+require 'rest-client'
 
-request = Net::HTTP::Get.new('/api/1/servers')
-request.add_field("x-cpauth-access",apikey)
-http = Net::HTTP.new('portal.cloudpassage.com', 443)
-http.use_ssl = true
-http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-http.start
-result = http.request(request)
+client = OAuth2::Client.new(clientid, clientsecret,
+	:site => "https://#{host}",
+	:token_url => '/oauth/access_token'
+)
+
+token = client.client_credentials.get_token.token
+
+result = RestClient.get "https://#{host}/api/1/servers", {
+        'Authorization' => "Bearer #{token}"
+}
 
 puts '# hosts file from our CP api'
 puts '# WARNING! This whole file is generated from /etc/hosts.template'

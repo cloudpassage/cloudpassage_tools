@@ -10,13 +10,15 @@ that is easily fixed if you are using something like RightScale to manage them.
 
 Files:
 	install.sh: copies files in place.
-	hosts.rb: This script dumps an /etc/hosts file out to stdout
+	hosts.rb: This script dumps an /etc/hosts file out to stdout using
+		the oauth2 gem to get the session key
+	hosts2.rb: This script dumps an /etc/hosts file out to stdout using
+		a basic rest-client interface.
 	hostsupdate.cron: This is the cron job that runs every 30 minutes
 
-The configure.sh script is an excerpt from one of our RightScale scripts
-that we use to install the syslog server.  It assumes that you have set
-the CLOUDPASSAGE_API_KEY variable.  You can do that by hand, or put it in
-a RightScript, whatever.
+The install.sh script is an excerpt from one of our RightScale scripts
+that we use to install the syslog server.  You will also have to go edit
+the hosts.rb script to have the proper keyid and secret key.
 
 Anyways, this isn't perfect, but it's probably good enough to give you ideas.
 

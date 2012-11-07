@@ -7,25 +7,34 @@
 #
 # Tim Spencer <tspencer@cloudpassage.com>
 #
-# you may need to say "gem install json" to make this work
+# you may need to install a few gems to make this work:
+#	oauth2, rest-client, json
 #
-apikey='FILL IN HERE' 
+# you will need to edit the XXX stuff to fill in your keys.
+#
+clientid = 'XXXXXXXX'
+clientsecret = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' 
+host = 'api.cloudpassage.com'
 zonename = 'static bastion hosts'
 
-require 'net/http'
-require 'json/pure'
 
-# set up connection
-http = Net::HTTP.new('portal.cloudpassage.com', 443)
-http.use_ssl = true
-http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-http.start
+require 'oauth2'
+require 'rest-client'
+
+# get the auth token
+client = OAuth2::Client.new(clientid, clientsecret,
+        :site => "https://#{host}",
+        :access_url => '/oauth/access_token',
+        :token_url => '/oauth/access_token'
+)
+
+token = client.client_credentials.get_token.token
 
 # get list of fw policy IDs
+result = RestClient.get "https://#{host}/api/1/firewall_policies", {
+        'Authorization' => "Bearer #{token}"
+}
 policyids = []
-request = Net::HTTP::Get.new('/api/1/firewall_policies')
-request.add_field("x-cpauth-access",apikey)
-result = http.request(request)
 data = JSON result.body
 policies = data['firewall_policies']
 policies.each do |policy|
@@ -34,9 +43,9 @@ end
 
 # get the fw zone we want
 zoneid = ''
-request = Net::HTTP::Get.new('/api/1/firewall_zones')
-request.add_field("x-cpauth-access",apikey)
-result = http.request(request)
+result = RestClient.get "https://#{host}/api/1/firewall_zones", {
+        'Authorization' => "Bearer #{token}"
+}
 data = JSON result.body
 zones = data['firewall_zones']
 zones.each do |zone|
@@ -71,11 +80,10 @@ rule = '{
 
 # loop through policy ids, putting the rule in
 policyids.each do |fwid|
-	uri = '/api/1/firewall_policies/' + fwid + '/firewall_rules'
-	request = Net::HTTP::Post.new(uri, initheader = {'Content-Type' =>'application/json'})
-	request.add_field("x-cpauth-access",apikey)
-	request.body = rule
-	result = http.request(request)
+	result = RestClient.post "https://#{host}/api/1/firewall_policies/#{fwid}/firewall_rules", rule, {
+		'Authorization' => "Bearer #{token}",
+		'Content-Type' =>'application/json'
+	}
 	if result.code != 201 
 		puts fwid + " said: " + result.code + ": " + result.msg
 	end
