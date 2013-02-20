@@ -11,6 +11,7 @@ host = 'api.cloudpassage.com'
 
 require 'oauth2'
 require 'rest-client'
+require 'json'
 
 client = OAuth2::Client.new(clientid, clientsecret,
 	:site => "https://#{host}",
