@@ -1,0 +1,12 @@
+
+	This library contains support routines used by Ruby programs
+accessing the CloudPassage Halo API.  It should be placed in the same
+directory as those programs (such as /usr/local/bin/ or ~/bin/ ).
+
+	Questions about the library should be sent to its author,
+William Stearns, wstearns@cloudpassage.com .
+
+
+
+
+
