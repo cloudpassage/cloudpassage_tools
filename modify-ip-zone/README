@@ -1,0 +1,107 @@
+======== Step by step setup.
+
+- You should have the Ruby language interpreter already installed.
+
+- You should also have the following ruby gems installed: oauth2,
+  rest-client, json, date, and optparse.  Sample command to install:
+    sudo gem install {missing_gem_name}
+
+- Copy modify-ip-zone.rb and wlslib.rb to the same directory in your
+path.  Both are available at http://www.stearns.org/halo-api/ . 
+wlslib.rb will also be found if you copy it to any directory in your
+ruby library search path, which can be seen by running
+echo 'puts $:' | irb
+
+- In the Halo portal (
+https://portal.cloudpassage.com/firewall_zones/new ), create an IP zone
+called fail2ban-ssh .  Give it a dummy address of 169.254.255.255 and press create.
+
+- Now configure your firewall policy.  You may want to test this on a
+test server before committing to a production machine.  Create any rules
+for authorized ssh users first so you can be sure they can get in even
+if fail2ban mistakenly adds one of their addresses.  Below those rules,
+add a rule with a source of the "fail2ban-ssh" IP zone, a service of
+"ssh" and Action DROP.
+
+- If you do not already have a Full Access API key, create one at
+https://portal.cloudpassage.com/settings/users#api_keys .  Press "Add
+new key", give it a descriptive name such as "Zone modification", and
+make sure to change the Permission to "Full Access" (a read-only API key
+can read a zone, but not change it).  Edit /etc/halo-api-keys on the
+system that will run this script and add your key on its own line.  The
+line should look like:
+
+8_char_key_id|32_char_secret_key
+
+The Key ID is directly visible at
+https://portal.cloudpassage.com/settings/users#api_keys .  To see the
+Secret Key, press Show to the right of the Key ID.  The character in
+between the ID and the Secret Key is a vertical pipe, above the
+backslash on a US keyboard.  Example:
+
+aabb3344|0123456789abcdeffedcba9876543210
+
+- Check ownership and permissions on /etc/halo-api-keys .  The file
+should be owned by the user running the script and mode 600.
+
+- Finally, modify the configuration of fail2ban so that it stops making
+changes to the firewall directly, and instead calls out to external
+programs to add and remove addresses.  Those commands will be the
+following, respectively:
+modify-ip-zone.rb -i aabb3344 -z fail2ban-ssh -a <ip>
+modify-ip-zone.rb -i aabb3344 -z fail2ban-ssh -r <ip>
+
+- To see addresses as they're added, you can refresh the following URL:
+https://portal.cloudpassage.com/firewall_zones
+
+- If you're ever concerned that this zone is interfering with normal
+ssh, edit any firewall policies using this zone and uncheck the "Active"
+box to the left of any firewall rules using this zone.  When you save
+your changes, new firewalls will be pushed out to these servers. 
+Remember to re-activate after troubleshooting is complete.
+
+======== Notes:
+- Note that by using a centralized zone as we are here, a single
+instance of fail2ban can feed an ssh blacklist into a firewall that's
+fed to an entire group of machines.
+
+- Instances of fail2ban on multiple machines can all use this software
+to update the IP zone simultaneously (no machine keeps the list locally;
+we pull the zone down and modify it before sending it back up each
+time).
+
+- You can run this script by hand to manually add or remove addresses.
+
+- The zone you attempt to create must have at least 1 and no more than
+375 addresses per Halo portal zone limits.  If you need more than 375
+addresses, break the list up into 375 address or less chunks and create 
+multiple zones.
+
+#Examples:
+
+#To see the command line help
+modify-ip-zone.rb -h
+
+#To add an address to a zone:
+modify-ip-zone.rb -i aabb3344 -z fail2ban-ssh -a 6.7.8.9
+
+#To remove an address from a zone:
+modify-ip-zone.rb -i aabb3344 -z fail2ban-ssh -r 6.7.8.9
+
+#You can add and remove multiple addresses with one invocation:
+modify-ip-zone.rb -i aabb3344 -z fail2ban-ssh -a 9.8.7.6/28 -a 1.1.2.2/30 -r 3.5.7.9
+
+#To ignore the current contents of the zone and start off with an empty list:
+modify-ip-zone.rb -i aabb3344 -z fail2ban-ssh --empty -a 9.8.7.6/28
+
+#To add a list of addresses, one per line, from stdin:
+echo -e '169.254.0.1\n169.254.1.0/24' | ./modify-ip-zone.rb -i aabb3344 -z fail2ban-ssh --empty --add-stdin
+
+#To remove a list of addresses supplied on stdin:
+echo -e '169.254.0.1' | ./modify-ip-zone.rb -i aabb3344 -z fail2ban-ssh --remove-stdin
+
+#If your zone has spaces or other characters that might be processed by the shell, surround it with quotes:
+modify-ip-zone.rb -i aabb3344 -z '|My Very odd zone|!!' -r 6.7.8.9
+
+#Example of loading a public blacklist into an IP zone
+curl -s -o - https://isc.sans.edu/block.txt | sed -e 's/#.*//' | egrep -v '(^$|^Start)' | awk '{print $1 "/" $3}' | ./modify-ip-zone.rb -i aabb3344 -z isc-blocklist --empty --add-stdin
