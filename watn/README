@@ -1,6 +1,6 @@
 Where Are They Now?
 
-This script provides an html-formatted page showing the IP
+	This script provides an html-formatted page showing the IP
 addresses from which Halo Portal users have logged in.  Reviewing this
 report allows you to quickly identify logins from suspcious networks
 unexpected countries, or at unusual times of day.
@@ -8,8 +8,9 @@ unexpected countries, or at unusual times of day.
 Requirements:
 - ruby
 - The following ruby gems installed: oauth2, rest-client, json, public_suffix,
-  optparse, resolv, date, and ip.  Sample command to install:
-  sudo gem install {missing_gem_name}
+  optparse, resolv, date, and ip.  The following command will install all
+  optional gems needed by the CloudPasssage API clients:
+  sudo gem install oauth2 rest-client json public_suffix ip
 - A Read only (preferred) or Full access API key and secret (*), placed in 
   /etc/halo-api-keys separated by a vertical pipe, like:
 aa00bb44|11111111222222223333333344444444

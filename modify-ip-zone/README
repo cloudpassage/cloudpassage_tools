@@ -3,8 +3,9 @@
 - You should have the Ruby language interpreter already installed.
 
 - You should also have the following ruby gems installed: oauth2,
-  rest-client, json, date, and optparse.  Sample command to install:
-    sudo gem install {missing_gem_name}
+  rest-client, json, date, and optparse.  The following command will
+  install all optional gems needed by the CloudPasssage API clients:
+  sudo gem install oauth2 rest-client json public_suffix ip
 
 - Copy modify-ip-zone.rb and wlslib.rb to the same directory in your
 path.  Both are available at http://www.stearns.org/halo-api/ . 

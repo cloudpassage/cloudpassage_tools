@@ -1,4 +1,4 @@
-This script looks at all Halo-secured systems in a single portal
+	This script looks at all Halo-secured systems in a single portal
 account and reports on all server-local accounts whose passwords have
 not been changed in over M days (where M is specified on the command
 line).
@@ -6,8 +6,9 @@ line).
 Requirements:
 - ruby
 - The following ruby gems installed: oauth2, rest-client, json, date, 
-  and optparse.  Sample command to install:
-  sudo gem install {missing_gem_name}
+  and optparse.  The following command will install all
+  optional gems needed by the CloudPasssage API clients:
+  sudo gem install oauth2 rest-client json public_suffix ip
 - A Read only (preferred) or Full access API key and secret , placed in 
   /etc/halo-api-keys separated by a vertical pipe, like:
 aa00bb44|11111111222222223333333344444444

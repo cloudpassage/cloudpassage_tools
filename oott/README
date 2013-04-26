@@ -1,6 +1,6 @@
 OOTT: One Of These Things is not like the other
 
-This provides one report per Halo group showing where the
+	This provides one report per Halo group showing where the
 machines are the same, and where they differ.
 
 Features:
@@ -25,8 +25,9 @@ Features:
 Requirements:
 - ruby
 - The following ruby gems installed: oauth2, rest-client, json, public_suffix,
-  optparse, resolv, date, and ip.  Sample command to install:
-  sudo gem install {missing_gem_name}
+  optparse, resolv, date, and ip.  The following command will install all 
+  optional gems needed by the CloudPasssage API clients:
+  sudo gem install oauth2 rest-client json public_suffix ip
 - A Read only (preferred) or Full access API key and secret (*), placed in 
   /etc/halo-api-keys separated by a vertical pipe, like:
 aa00bb44|11111111222222223333333344444444
@@ -51,3 +52,15 @@ oott.rb -h
 
 #Generate html reports for each group and save to the current directory:
 oott.rb -i aabbcc00 
+
+
+
+
+
+Advanced uses:
+
+#If you manage more than one Halo Portal organization, you can generate
+#a report that covers logins from all of them by specifying "-i {key}"
+#multiple times (with corresponding lines for all keys in
+#/etc/halo-api-keys :
+oott.rb -i aabbcc00 -i 7890abcd
