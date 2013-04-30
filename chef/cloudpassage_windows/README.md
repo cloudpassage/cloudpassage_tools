@@ -9,9 +9,10 @@ This cookbook depends on the powershell cookbook.
 Attributes
 ----------
 There are default attributes that need to be updated with your specific daemon-key and serverGroup tag naming scheme.
-default[:cloudpassage_windows][:halo_exe] = "cphalo-2.7.8-win64.exe"
-default[:cloudpassage_windows][:daemon_key] = "abc123abc123abc123abc123abc123ab"
-default[:cloudpassage_windows][:tag] = "windowsRocks"
+
+default[:cloudpassage_windows][:halo_exe] = "cphalo-2.7.8-win64.exe"<br>
+default[:cloudpassage_windows][:daemon_key] = "abc123abc123abc123abc123abc123ab"<br>
+default[:cloudpassage_windows][:tag] = "windowsRocks"<br>
 
 Usage
 -----
