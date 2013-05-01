@@ -1,0 +1,8 @@
+name 'puppet-cloudpassage'
+version '0.5.0'
+source 'https://github.com/rkhtibi/puppet-cloudpassage'
+author 'rdk'
+license 'Apache License 2.0'
+summary 'A Puppet module for managing CloudPassage'
+description 'A Puppet module for managing CloudPassage'
+project_page 'https://github.com/rkhtibi/puppet-cloudpassage'
