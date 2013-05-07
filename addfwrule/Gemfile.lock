@@ -1,0 +1,31 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    faraday (0.8.7)
+      multipart-post (~> 1.1)
+    httpauth (0.2.0)
+    json (1.7.7)
+    jwt (0.1.8)
+      multi_json (>= 1.5)
+    mime-types (1.23)
+    multi_json (1.7.3)
+    multi_xml (0.5.3)
+    multipart-post (1.2.0)
+    oauth2 (0.9.1)
+      faraday (~> 0.8)
+      httpauth (~> 0.1)
+      jwt (~> 0.1.4)
+      multi_json (~> 1.0)
+      multi_xml (~> 0.5)
+      rack (~> 1.2)
+    rack (1.5.2)
+    rest-client (1.6.7)
+      mime-types (>= 1.16)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  json
+  oauth2
+  rest-client
