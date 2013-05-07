@@ -9,11 +9,13 @@
 #
 # you may need to install a few gems to make this work:
 #	oauth2, rest-client, json
-#
-# you will need to edit the XXX stuff to fill in your keys.
-#
-clientid = 'XXXXXXXX'
-clientsecret = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' 
+
+# API ID and key created via Halo portal:
+# https://portal.cloudpassage.com/settings/users (API tab)
+# Read id and key from environment for convenience
+clientid = ENV['HALO_ID']
+clientsecret = ENV['HALO_SECRET_KEY']
+
 host = 'api.cloudpassage.com'
 zonename = 'static bastion hosts'
 
