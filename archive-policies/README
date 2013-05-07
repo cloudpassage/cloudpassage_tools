@@ -1,12 +1,13 @@
-This script downloads all the FIM and firewall policies
+	This script downloads all the FIM and firewall policies
 contained in one or more Halo Portal accounts.  As of this writing, it
 does not support downloading Configuration policies.
 
 Requirements:
 - ruby
 - The following ruby gems installed: oauth2, rest-client, json, date, 
-  and optparse.  Sample command to install:
-  sudo gem install {missing_gem_name}
+  and optparse.  The following command will install all
+  optional gems needed by the CloudPasssage API clients:
+  sudo gem install oauth2 rest-client json public_suffix ip
 - A Read only (preferred) or Full access API key and secret , placed in 
   /etc/halo-api-keys separated by a vertical pipe, like:
 aa00bb44|11111111222222223333333344444444

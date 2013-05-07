@@ -40,7 +40,7 @@ aa00bb44|11111111222222223333333344444444|api.example.com:9999
   API Keys.
 
 Installation:
-- Copy oott.rb and wlslib.rb to the same directory in your path.
+- Copy one-of-these-things.rb and wlslib.rb to the same directory in your path.
 wlslib.rb will also be found if you copy it to any directory in your
 ruby library search path, which can be seen by running
 echo 'puts $:' | irb
@@ -48,10 +48,10 @@ echo 'puts $:' | irb
 Sample invocations:
 
 #See help text and parameters:
-oott.rb -h
+one-of-these-things.rb -h
 
 #Generate html reports for each group and save to the current directory:
-oott.rb -i aabbcc00 
+one-of-these-things.rb -i aabbcc00 
 
 
 
@@ -63,4 +63,4 @@ Advanced uses:
 #a report that covers logins from all of them by specifying "-i {key}"
 #multiple times (with corresponding lines for all keys in
 #/etc/halo-api-keys :
-oott.rb -i aabbcc00 -i 7890abcd
+one-of-these-things.rb -i aabbcc00 -i 7890abcd

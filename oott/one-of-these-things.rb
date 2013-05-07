@@ -35,7 +35,7 @@
 # you may need to install the oauth2, rest-client, and json gems with:
 # sudo gem install oauth2 rest-client json
 
-#Version 3.4
+#Version 3.5
 
 #======== User-modifiable values
 api_key_file = '/etc/halo-api-keys'
@@ -154,7 +154,12 @@ def load_issues(aspects,aspect_scores,issues_json,server_id,status_scores)
   end
 
   #Load up each of the scan rules and checks
-  if issues_json['sca'] != nil
+  if (issues_json['sca'] == nil) or (issues_json['sca']['findings'] == nil)
+    if (issues_json['sca'] != nil) and issues_json['sca']['status'] != "failed"
+      $stderr.puts "Nil sca or findings for:"
+      $stderr.puts issues_json.inspect
+    end
+  else
     issues_json['sca']['findings'].each do |one_rule|
       #Remove any html in the rule name
       rule_name = "Cfg rule-#{one_rule['rule_name'].to_s.gsub(/<[^>]*>/,"")}"
@@ -182,6 +187,8 @@ def load_issues(aspects,aspect_scores,issues_json,server_id,status_scores)
           check_name = rule_name + " (check-#{one_check['target']} owned by group #{one_check['expected']})"
         when 'dir_owner_uid', 'file_owner_uid'
           check_name = rule_name + " (check-#{one_check['target']} owned by #{one_check['expected']})"
+        when 'dir_sticky_bit',
+          check_name = rule_name + " (world writeable directory without sticky bit: #{one_check['expected']})"
         when 'file_presence'
           check_name = rule_name + " (check-#{one_check['target']} exists: #{one_check['expected']})"
         when 'file_regex'	#Does not list the regex
@@ -228,24 +235,23 @@ def load_issues(aspects,aspect_scores,issues_json,server_id,status_scores)
           check_name = rule_name + " (check-#{one_check['target']} has a password: #{one_check['expected']})"
         when 'user_home_presence'
           check_name = rule_name + " (check-#{one_check['target']} has a home directory #{one_check['home_directory']}: #{one_check['expected']})"
-        when 'user_home_file_group_ownership'
-#This has an array with the file names we could later harvest
+        when 'user_home_file_group_ownership'		#This has an array with the file names we could later harvest
           check_name = rule_name + " (check-#{one_check['target']} home directory #{one_check['home_directory']} has files group owned by another user: #{one_check['expected']})"
-        when 'user_home_file_ownership'
-#This has an array with the file names we could later harvest
+        when 'user_home_file_ownership'			#This has an array with the file names we could later harvest
           check_name = rule_name + " (check-#{one_check['target']} home directory #{one_check['home_directory']} has files owned by another user: #{one_check['expected']})"
+        when 'user_home_files_umask'			#This has an array with the file names we could later harvest
+          check_name = rule_name + " (check-#{one_check['target']} home directory #{one_check['home_directory']} sets insecure umask: #{one_check['expected']})"
+        when 'user_home_files_detect_path_statements'	#This has an array with the file names we could later harvest
+          check_name = rule_name + " (check-#{one_check['target']} has no unsafe PATH statements in #{one_check['home_directory']}: #{one_check['expected']})"
         when 'user_home_group_ownership'
           check_name = rule_name + " (check-#{one_check['target']} home directory #{one_check['home_directory']} owned by gid: #{one_check['expected']})"
         when 'user_home_ownership'
           check_name = rule_name + " (check-#{one_check['target']} home directory #{one_check['home_directory']} owned by uid: #{one_check['expected']})"
-        when 'user_home_device_files'
-#This has an array with the file names we could later harvest
+        when 'user_home_device_files'			#This has an array with the file names we could later harvest
           check_name = rule_name + " (check-#{one_check['target']} home directory #{one_check['home_directory']} has character or block devices: #{one_check['expected']})"
-        when 'user_home_setgid_files'
-#This has an array with the file names we could later harvest
+        when 'user_home_setgid_files'			#This has an array with the file names we could later harvest
           check_name = rule_name + " (check-#{one_check['target']} home directory #{one_check['home_directory']} has setgid files: #{one_check['expected']})"
-        when 'user_home_setuid_files'
-#This has an array with the file names we could later harvest
+        when 'user_home_setuid_files'			#This has an array with the file names we could later harvest
           check_name = rule_name + " (check-#{one_check['target']} home directory #{one_check['home_directory']} has setuid files: #{one_check['expected']})"
         when 'user_uid_is'
           check_name = rule_name + " (check-#{one_check['target']} has uid #{one_check['expected']})"
@@ -256,23 +262,21 @@ def load_issues(aspects,aspect_scores,issues_json,server_id,status_scores)
 #{"scan_status"=>"ok", "status"=>"bad", "type"=>"windows_local_security_policy", "target"=>"secedit", "actual"=>"0", "expected"=>"1"}
           check_name = rule_name + " (check-win_local_sec_pol, #{one_check['target']} exists: #{one_check['expected']})"
         else
-          $stderr.puts "No check_name defined for #{one_check['type']}.  Exiting."
-          p one_check
-          exit 1
+          $stderr.puts "No check_name defined for #{one_check['type']}."
+          $stderr.puts one_check.inspect
         end
 
         check_name = check_name.to_s.gsub(/<[^>]*>/,"")
 
         case one_check['type']
-        when 'configuration', 'dir_acl', 'dir_owner_gid', 'dir_owner_uid', 'file_acl', 'file_owner_gid', 'file_owner_uid', 'file_presence', 'file_regex', 'file_set_gid', 'file_set_uid', 'group_gid_is', 'group_has_password', 'group_has_users', 'password_is_username', 'port_process', 'port_white', 'process_effective_gid', 'process_effective_uid', 'process_presence', 'user_file_presence', 'user_has_groups', 'user_has_logged_in', 'user_has_not_logged_in', 'user_has_password', 'user_home_file_group_ownership', 'user_home_file_ownership', 'user_home_group_ownership', 'user_home_ownership', 'user_home_presence', 'user_home_device_files', 'user_home_setgid_files', 'user_home_setuid_files', 'user_uid_is', 'windows_file_presence', 'windows_local_security_policy'
+        when 'configuration', 'dir_acl', 'dir_owner_gid', 'dir_owner_uid', 'dir_sticky_bit', 'file_acl', 'file_owner_gid', 'file_owner_uid', 'file_presence', 'file_regex', 'file_set_gid', 'file_set_uid', 'group_gid_is', 'group_has_password', 'group_has_users', 'password_is_username', 'port_process', 'port_white', 'process_effective_gid', 'process_effective_uid', 'process_presence', 'user_file_presence', 'user_has_groups', 'user_has_logged_in', 'user_has_not_logged_in', 'user_has_password', 'user_home_file_group_ownership', 'user_home_file_ownership', 'user_home_group_ownership', 'user_home_ownership', 'user_home_presence', 'user_home_device_files', 'user_home_files_detect_path_statements', 'user_home_files_umask', 'user_home_setgid_files', 'user_home_setuid_files', 'user_uid_is', 'windows_file_presence', 'windows_local_security_policy'
           aspects[check_name] = { } unless aspects.has_key?(check_name)
           aspects[check_name][server_id] = check_value
           aspect_scores[check_name] = { } unless aspect_scores.has_key?(check_name)
           aspect_scores[check_name][server_id] = status_scores["#{one_check['status']}/#{one_rule['critical']}"]
         else
-          $stderr.puts "No check storage requested for #{one_check['type']}.  Exiting."
-          p one_check
-          exit 1
+          $stderr.puts "No check storage requested for #{one_check['type']}."
+          $stderr.puts one_check.inspect
         end
       end
     end
