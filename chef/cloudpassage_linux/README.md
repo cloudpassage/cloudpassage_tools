@@ -1,49 +1,46 @@
-cloudpassage_linux Cookbook
-=============================
+<!-- Write your ReadMe in markdown format, using this template. Use the GitHub Flavored markdown, as described here:
+* https://help.github.com/articles/github-flavored-markdown -- most of what you need
+* http://daringfireball.net/projects/markdown/syntax -- additional markdown details & background> -->
+
+
+#CloudPassage Linux Cookbook <!-- title of your ReadMe -->
+
+Version: 1.0  
+Author: Eric Hoffmann - ehoffmann@cloudpassage.com
+
+<!-- high-level summary of what this tool does and why it is useful. At least one paragraph -->
+
 This cookbook installs Halo on Debian, Ubuntu, CentOS, Fedora, RHEL and Amazon Linux servers.
 
-Requirements
-------------
+
+##Requirements and Dependencies
+<!-- required packages, gems, libraries, other entities that this program needs to run.
+Use asterisk-space if you want to make a bullet item.   -->
+
 The default recipe relies on sudo and curl being installed. It does not list them as cookbook dependencies.
 
-Attributes
-----------
-There are default attributes that need to be updated with your specific daemon-key and serverGroup tag naming scheme.
 
-default[:cloudpassage_linux][:daemon_key] = "abc123abc123abc123abc123abc123ab"<br>
-default[:cloudpassage_linux][:tag] = "chefRocks"<br>
+##List of Files
+<!-- list all libraries, scripts, other files provided with this tool. 
+Use asterisk-space if you want to make a bullet item.  -->
 
-Usage
------
-```
-knife bootstrap <your server instance FQDN> -x <root|ec2-user, other privileged user_name> -i “~/.ssh/<ssh_key>” -r "cloudpassage_linux" --sudo
-```
+* default.rb - the cookbook
+* default.rb - attributes file
 
-License and Authors
--------------------
-Authors: Eric Hoffmann <ehoffmann@cloudpassage.com> 
 
-Copyright (c) 2013, CloudPassage, Inc.
-All rights reserved.
+##Usage
+<!-- show a typical usage statement, syntax diagram, or step-by-step usage instructions.  -->
+<!-- Indent code blocks and command-line examples 4 spaces -->
+<!-- Show output examples, if useful --> 
+<!-- Make subsections if desired. Use 3 hashmarks and asterisks for subheadings, e.g., "###*Required Customizations:*" -->
 
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of the CloudPassage, Inc. nor the
-      names of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
+The attributes file contains two default attributes that need to be replaced with your specific Halo daemon key and server-group tag name:
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL CLOUDPASSAGE, INC. BE LIABLE FOR ANY DIRECT,
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED ANDON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
-OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+    default[:cloudpassage_linux][:daemon_key] = "abc123abc123abc123abc123abc123ab"
+    default[:cloudpassage_linux][:tag] = "chefRocks"
+
+Command-line usage:
+
+    knife bootstrap <your server instance FQDN> -x <root|ec2-user, other privileged user_name> -i “~/.ssh/<ssh_key>” -r "cloudpassage_linux" --sudo
+
+<!-- NOTE: Do not include license material in this file; that belongs in LICENSE.txt and in the source-code files themselves. -->
