@@ -3,7 +3,7 @@
 * http://daringfireball.net/projects/markdown/syntax -- additional markdown details & background> -->
 
 
-#CloudPassage Linux Cookbook <!-- title of your ReadMe -->
+#CloudPassage Linux Cookbook
 
 Version: 1.0  
 Author: Eric Hoffmann - ehoffmann@cloudpassage.com
